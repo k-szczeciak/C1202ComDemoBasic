@@ -1,0 +1,10 @@
+﻿<Application x:Class="C1202ComDemoBasic.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:C1202ComDemoBasic"
+             StartupUri="MainWindow.xaml"
+             Exit="Application_Exit">
+    <Application.Resources>
+         
+    </Application.Resources>
+</Application>

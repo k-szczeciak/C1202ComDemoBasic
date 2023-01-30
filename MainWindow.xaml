@@ -32,13 +32,18 @@
 
 
         <Button Grid.Row="1" Grid.Column="1" Content="Request All Features" Margin="5" Command="{Binding BtnGetNewValue}"/>
-        <Button Grid.Row="2" Grid.Column="1" Content="Request cyclic" Margin="5" Background="Green" Command="{Binding BtnGetNewValue}"/>
+        <StackPanel Grid.Row="2" Grid.Column="1"  Orientation="Horizontal" HorizontalAlignment="Stretch">
+            <Button Content="Start Cyclic" Margin="5" Background="{Binding BtnStartBackgrCol}" d:Background="LightSalmon" Command="{Binding BtnGetNewValCyclic}"/>
+            <Button Content="Stop Cyclic" Margin="5" Background="{Binding BtnStopBackgrCol}" d:Background="LightGray" Command="{Binding BtnStopCyclic}"/>
+        </StackPanel>
+        
         <Slider Grid.Row="3" Grid.Column="1"  HorizontalAlignment="Stretch" VerticalAlignment="Center" 
                 Maximum="10" Minimum="1" SmallChange="2" TickFrequency="1" TickPlacement="BottomRight"
-                IsSnapToTickEnabled="True"/>
-        <Label Grid.Row="3" Grid.Column="1" Content="10 s" HorizontalAlignment="Center" FontSize="14"/>
+                IsSnapToTickEnabled="True" Value="{Binding sliderValue}"
+                
+                />
+        <Label Grid.Row="3" Grid.Column="1" Content="{Binding sliderValue}" HorizontalAlignment="Center" FontSize="14"/>
         <StackPanel Grid.Row="4" Grid.Column="1">
-            <Button Content="Change View" Margin="5" Command="{Binding BtnChangeView}"/>
             <Button Content="Clear Table" Margin="5" Command="{Binding BtnClearData}"/>
         </StackPanel>
 

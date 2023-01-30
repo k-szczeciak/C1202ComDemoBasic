@@ -31,8 +31,8 @@ namespace C1202ComDemoBasic
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            mainViewCtrl testObj = (mainViewCtrl)Application.Current.MainWindow.DataContext;
-            testObj.deviceCom.Close();
+            mainViewCtrl _mainViewCtrl = (mainViewCtrl)Application.Current.MainWindow.DataContext;
+            _mainViewCtrl.c1202Com.comPort.Close();
         }
     }
 }

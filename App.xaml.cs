@@ -13,9 +13,6 @@ namespace C1202ComDemoBasic
     /// </summary>
     public partial class App : Application
     {
-        private void Application_Exit(object sender, ExitEventArgs e)
-        {
-            
-        }
+
     }
 }

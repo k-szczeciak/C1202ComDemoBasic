@@ -7,6 +7,8 @@ using System.Threading;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Linq;
+using System.Management;
+using System.Timers;
 
 namespace C1202ComDemoBasic.Services
 {
@@ -14,6 +16,12 @@ namespace C1202ComDemoBasic.Services
     {
         // commands:
         string getAllFeatures = "?\r";
+
+        // comport settings:
+        int deviceBaudRate = 9600;
+        int deviceBitsLength = 7;
+
+        // patterns:
         string patternError = @"[1-3]?\?sERR[1-9]";
         string patternValue = @"^[1-3]?\s?[+-]?[0-9]{1,3}.[0-9]{1,5}\s[a-z]{2,4}$";
         string patternValueT = @"^[1-3]?\s?[+-]?[0-9]{1,3}.[0-9]{1,5}\s[a-z]{2,4}\s[<>=]$";
@@ -21,14 +29,52 @@ namespace C1202ComDemoBasic.Services
 
         string reply = "";
 
-        SerialPort comPort = null;
-        //FeatureValue[] featureValues;
-
+        public SerialPort comPort = null;
+        public FeatureValue[] featureValues;
         mainViewCtrl _mainViewCtrl;
         int activeFeature = 0;
+        
 
+        public C1202Com(mainViewCtrl _mainViewCtrl)
+        {
+            this._mainViewCtrl = _mainViewCtrl;
 
-        MainWindow mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+            featureValues = new FeatureValue[3];
+            featureValues[0] = new FeatureValue();
+            featureValues[1] = new FeatureValue();
+            featureValues[2] = new FeatureValue();
+        }
+
+        public bool getPort()
+        {
+            List<String> ComPortListLong;
+            String [] ComPortListShort = SerialPort.GetPortNames();
+            bool result = false;
+            using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE Caption like '%(COM%'"))
+            {
+                var portnames = SerialPort.GetPortNames();
+                var ports = searcher.Get().Cast<ManagementBaseObject>().ToList().Select(p => p["Caption"].ToString());
+
+                ComPortListLong = portnames.Select(n => n + " - " + ports.FirstOrDefault(s => s.Contains(n))).ToList();
+
+                int i = 0;
+                foreach (String s in ComPortListLong)
+                {
+                    if (s.Contains("USB Serial Port"))
+                    {
+                        comPort = new System.IO.Ports.SerialPort(portnames[i],
+                            deviceBaudRate,
+                            System.IO.Ports.Parity.Even,
+                            deviceBitsLength,
+                            System.IO.Ports.StopBits.Two
+                            );
+                        result = true;
+                    }
+                    i++;
+                }
+            }
+            return result; // true = ok
+        }
 
         public void getAllMeasurements()
         {
@@ -40,7 +86,7 @@ namespace C1202ComDemoBasic.Services
             }
             catch(Exception e)
             {
-                Console.WriteLine("Can not open com port");
+                Console.WriteLine("Can not write to com port");
             }
         }
 
@@ -56,7 +102,7 @@ namespace C1202ComDemoBasic.Services
             }
             catch (Exception e)
             {
-                Console.WriteLine("Can not open com port");
+                Console.WriteLine("Can not write to com port");
             }
         }
 
@@ -84,12 +130,6 @@ namespace C1202ComDemoBasic.Services
                 _mainViewCtrl.updateValues(activeFeature);
                 activeFeature = 0;
             }
-        }
-
-        public C1202Com(SerialPort serialPort, mainViewCtrl _mainViewCtrl)
-        {
-            this._mainViewCtrl = _mainViewCtrl;
-            this.comPort = serialPort;
         }
 
         private void decomposeReply(string inputStr)
@@ -126,51 +166,50 @@ namespace C1202ComDemoBasic.Services
                     mod = -1;
                 }
                 
-                _mainViewCtrl.featureValues[x].valueText = "-.-";
-                _mainViewCtrl.featureValues[x].unit = "";
-                _mainViewCtrl.featureValues[x].isToleranceEnabled = false;
-                _mainViewCtrl.featureValues[x].isInTolerance = false;
-                _mainViewCtrl.featureValues[x].isInWarning = false;
+                featureValues[x].valueText = "-.-";
+                featureValues[x].unit = "";
+                featureValues[x].isToleranceEnabled = false;
+                featureValues[x].isInTolerance = false;
+                featureValues[x].isInWarning = false;
 
-                // qualification: err, value, value w. T, val w. TW
                 if (rgErr.IsMatch(fraction) == true){
-                    _mainViewCtrl.featureValues[x].valueText = "no value (" + parts[1 + mod] + ")";
-                    _mainViewCtrl.featureValues[x].unit = "";
-                    _mainViewCtrl.featureValues[x].isToleranceEnabled = false;
-                    _mainViewCtrl.featureValues[x].isInTolerance = false;
-                    _mainViewCtrl.featureValues[x].isInWarning = false;
+                    featureValues[x].valueText = "no value (" + parts[1 + mod] + ")";
+                    featureValues[x].unit = "";
+                    featureValues[x].isToleranceEnabled = false;
+                    featureValues[x].isInTolerance = false;
+                    featureValues[x].isInWarning = false;
                 }
                 else if (rgValue.IsMatch(fraction) == true)
                 {
-                    _mainViewCtrl.featureValues[x].valueText = parts[1 + mod];
-                    _mainViewCtrl.featureValues[x].unit = parts[2 + mod];
-                    _mainViewCtrl.featureValues[x].isToleranceEnabled = false;
-                    _mainViewCtrl.featureValues[x].isInTolerance = true;
-                    _mainViewCtrl.featureValues[x].isInWarning = true;
+                    featureValues[x].valueText = parts[1 + mod];
+                    featureValues[x].unit = parts[2 + mod];
+                    featureValues[x].isToleranceEnabled = false;
+                    featureValues[x].isInTolerance = true;
+                    featureValues[x].isInWarning = true;
                 }
                 else if (rgValueT.IsMatch(fraction) == true)
                 {
-                    _mainViewCtrl.featureValues[x].valueText = parts[1 + mod];
-                    _mainViewCtrl.featureValues[x].unit = parts[2 + mod];
-                    _mainViewCtrl.featureValues[x].isToleranceEnabled = true;
+                    featureValues[x].valueText = parts[1 + mod];
+                    featureValues[x].unit = parts[2 + mod];
+                    featureValues[x].isToleranceEnabled = true;
                     if (parts[3 + mod].Equals("="))
                     {
-                        _mainViewCtrl.featureValues[x].isInTolerance = true;
-                        _mainViewCtrl.featureValues[x].isInWarning = true;
+                        featureValues[x].isInTolerance = true;
+                        featureValues[x].isInWarning = true;
                     }
                 }
                 else if (rgValueTW.IsMatch(fraction) == true)
                 {
-                    _mainViewCtrl.featureValues[x].valueText = parts[1 + mod];
-                    _mainViewCtrl.featureValues[x].unit = parts[2 + mod];
-                    _mainViewCtrl.featureValues[x].isToleranceEnabled = true;
+                    featureValues[x].valueText = parts[1 + mod];
+                    featureValues[x].unit = parts[2 + mod];
+                    featureValues[x].isToleranceEnabled = true;
                     if (parts[3 + mod].Equals("="))
                     {
-                        _mainViewCtrl.featureValues[x].isInTolerance = true;
+                        featureValues[x].isInTolerance = true;
                     }
                     if (parts[4 + mod].Equals("="))
                     {
-                        _mainViewCtrl.featureValues[x].isInWarning = true;
+                        featureValues[x].isInWarning = true;
                     }
                 }
             }

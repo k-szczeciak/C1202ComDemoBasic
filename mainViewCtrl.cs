@@ -10,22 +10,8 @@ namespace C1202ComDemoBasic
 {
     class mainViewCtrl : ObservableObject
     {
-
-        string deviceComPort = "COM16";
-        int deviceBaudRate = 9600;
-        int deviceBitsLength = 7;
-        C1202Com c1202com = null;
-        public SerialPort deviceCom = null;
-
-        private FeatureValue[] _featureValues;
-
-        public FeatureValue[] featureValues
-        {
-            get { return _featureValues; }
-            set {
-                _featureValues = value;
-            }
-        }
+        public C1202Com c1202Com = null;
+        private static System.Timers.Timer aTimer;
 
         private String _featureValue1;
 
@@ -39,7 +25,6 @@ namespace C1202ComDemoBasic
         }
 
         private String _featureValue2;
-
         public String featureValue2
         {
             get { return _featureValue2; }
@@ -51,7 +36,6 @@ namespace C1202ComDemoBasic
         }
 
         private String _featureValue3;
-
         public String featureValue3
         {
             get { return _featureValue3; }
@@ -63,7 +47,6 @@ namespace C1202ComDemoBasic
         }
 
         private string _backgrColor1;
-
         public string backgrColor1
         {
             get { return _backgrColor1; }
@@ -74,7 +57,6 @@ namespace C1202ComDemoBasic
         }
 
         private string _backgrColor2;
-
         public string backgrColor2
         {
             get { return _backgrColor2; }
@@ -86,7 +68,6 @@ namespace C1202ComDemoBasic
         }
 
         private string _backgrColor3;
-
         public string backgrColor3
         {
             get { return _backgrColor3; }
@@ -139,28 +120,54 @@ namespace C1202ComDemoBasic
             }
         }
 
+        private string _BtnStartBackgrCol;
+            
+        public string BtnStartBackgrCol
+        {
+            get { return _BtnStartBackgrCol; }
+            set {
+                _BtnStartBackgrCol = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _BtnStopBackgrCol;
+
+        public string BtnStopBackgrCol
+        {
+            get { return _BtnStopBackgrCol; }
+            set
+            {
+                _BtnStopBackgrCol = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _sliderValue;
+
+        public string sliderValue
+        {
+            get { return _sliderValue; }
+            set {
+                _sliderValue = value;
+                OnPropertyChanged();
+            }
+        }
+
+
         public RelayCommand BtnGetNewValue { get; set; }
-        public RelayCommand BtnChangeView { get; set; }
         public RelayCommand BtnGetFeat1 { get; set; }
         public RelayCommand BtnGetFeat2 { get; set; }
         public RelayCommand BtnGetFeat3 { get; set; }
         public RelayCommand BtnClearData { get; set; }
-
-
+        public RelayCommand BtnGetNewValCyclic { get; set; }
+        public RelayCommand BtnStopCyclic { get; set; }
 
         public mainViewCtrl()
         {
-            deviceCom = new System.IO.Ports.SerialPort(deviceComPort,
-                                deviceBaudRate,
-                                System.IO.Ports.Parity.Even,
-                                deviceBitsLength,
-                                System.IO.Ports.StopBits.Two
-                                );
-
-            featureValues = new FeatureValue[3];
-            featureValues[0] = new FeatureValue();
-            featureValues[1] = new FeatureValue();
-            featureValues[2] = new FeatureValue();
+            c1202Com = new C1202Com(this);
+            c1202Com.getPort();
+            c1202Com.portListen();
 
             //initial values:
             featureValue1 = "-.-";
@@ -170,34 +177,45 @@ namespace C1202ComDemoBasic
             backgrColor2 = "Transparent";
             backgrColor3 = "Transparent";
 
+            BtnStartBackgrCol = "LightGreen";
+            BtnStopBackgrCol = "LightGray";
+
+            sliderValue = "4";
+
             valueList1 = new List<dataDisplModel>();
             valueList2 = new List<dataDisplModel>();
             valueList3 = new List<dataDisplModel>();
             
-            c1202com = new C1202Com(deviceCom, this);
-            c1202com.portListen();
-
             BtnGetNewValue = new RelayCommand(o =>
             {
-                c1202com.getAllMeasurements();
+                c1202Com.getAllMeasurements();
             });
             BtnGetFeat1 = new RelayCommand(o =>
             {
-                c1202com.getFeature(1);
+                c1202Com.getFeature(1);
             });
             BtnGetFeat2 = new RelayCommand(o =>
             {
-                c1202com.getFeature(2);
+                c1202Com.getFeature(2);
             });
             BtnGetFeat3 = new RelayCommand(o =>
             {
-                c1202com.getFeature(3);
+                c1202Com.getFeature(3);
             });
 
-            BtnChangeView = new RelayCommand(o =>
+            BtnGetNewValCyclic = new RelayCommand(o =>
             {
-                // change view between list and graph
+                cyclicRequest();
+                BtnStartBackgrCol = "LightGray";
+                BtnStopBackgrCol = "LightSalmon";
             });
+            BtnStopCyclic = new RelayCommand(o =>
+            {
+                stopRequest();
+                BtnStartBackgrCol = "LightGreen";
+                BtnStopBackgrCol = "LightGray";
+            });
+
             BtnClearData = new RelayCommand(o =>
             {
                 valueList1.Clear();
@@ -210,7 +228,7 @@ namespace C1202ComDemoBasic
         }
 
 
-        public void updateValues(int featureNo) // 0 - all, 1..3 feature No
+        public void updateValues(int featureNo) // 0 - all features, 1..3 only one feature
         {
             if (featureNo == 0)
             {
@@ -250,25 +268,58 @@ namespace C1202ComDemoBasic
 
         private String evaluateOneFeat(int featureNo)
         {
-            return featureValues[featureNo].valueText + " " + featureValues[featureNo].unit;
+            return c1202Com.featureValues[featureNo].valueText + " " + c1202Com.featureValues[featureNo].unit;
         }
         private String evalOneFeatColor(int featureNo)
         {
             String result = "Transparent";
-            if (featureValues[featureNo].isToleranceEnabled == true)
+            if (c1202Com.featureValues[featureNo].isToleranceEnabled == true)
             {
                 result = "Green";
-                if (featureValues[featureNo].isInWarning == false)
+                if (c1202Com.featureValues[featureNo].isInWarning == false)
                 {
                     result = "Yellow";
                 }
-                if (featureValues[featureNo].isInTolerance == false)
+                if (c1202Com.featureValues[featureNo].isInTolerance == false)
                 {
                     result = "Red";
                 }
             }
             return result;
         }
+        public void cyclicRequest()
+        {
+            // Create a timer and set a two second interval.
+            aTimer = new System.Timers.Timer();
+            aTimer.Interval =  int.Parse(sliderValue) * 1000;
+
+            // Hook up the Elapsed event for the timer. 
+            aTimer.Elapsed += OnTimedEvent;
+
+            // Have the timer fire repeated events (true is the default)
+            aTimer.AutoReset = true;
+
+            // Start the timer
+            aTimer.Enabled = true;
+        }
+        public void stopRequest()
+        {
+            try
+            {
+                aTimer.Stop();
+            }catch (Exception e)
+            {
+                
+            }
+            
+        }
+
+
+            private void OnTimedEvent(Object source, System.Timers.ElapsedEventArgs e)
+        {
+            c1202Com.getAllMeasurements();
+        }
+
 
     }
 }
